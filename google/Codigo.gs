@@ -41,7 +41,18 @@ function onOpen() {
     .addToUi();
 }
 
+// Pode rodar pelo menu, pelo botão "Executar" do editor ou sozinho no primeiro pedido.
 function configurar() {
+  prepararPlanilha_();
+  try {
+    SpreadsheetApp.getUi().alert('Pronto. Aba "Pedidos" e pasta "' + NOME_PASTA_RAIZ + '" criadas no seu Google Drive.\n\n' +
+      'Agora publique o script: Implantar > Nova implantação > App da Web.');
+  } catch (err) {
+    console.log('Configurado. Aba "Pedidos" e pasta "' + NOME_PASTA_RAIZ + '" criadas.'); // rodou pelo editor
+  }
+}
+
+function prepararPlanilha_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const props = PropertiesService.getScriptProperties();
 
@@ -61,9 +72,6 @@ function configurar() {
     props.setProperty('PASTA_RAIZ', DriveApp.createFolder(NOME_PASTA_RAIZ).getId());
   }
   props.setProperty('PLANILHA', ss.getId());
-
-  SpreadsheetApp.getUi().alert('Pronto. Aba "Pedidos" e pasta "' + NOME_PASTA_RAIZ + '" criadas no seu Google Drive.\n\n' +
-    'Agora publique o script: Implantar > Nova implantação > App da Web.');
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +80,7 @@ function configurar() {
 function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents);
+    if (!PropertiesService.getScriptProperties().getProperty('PLANILHA')) prepararPlanilha_();
     switch (req.acao) {
       case 'enviar': return json_(enviarPedido_(req));
       case 'listar': return json_(listarPedidos_(req));

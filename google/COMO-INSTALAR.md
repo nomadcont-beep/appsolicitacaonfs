@@ -9,28 +9,44 @@ O app do cliente conversa com os dois por meio de um script (Apps Script).
 
 ## 1. Criar a planilha
 1. Abra https://sheets.new (já logado na conta do escritório).
-2. Dê o nome **Pedidos NFS-e**.
+2. Clique em "Planilha sem título", no alto à esquerda, e dê o nome **Pedidos NFS-e**.
 
 ## 2. Colar o script
-1. Na planilha: **Extensões > Apps Script**.
-2. Apague o que estiver escrito e cole todo o conteúdo do arquivo `google/Codigo.gs`.
-3. Clique no disquete (**Salvar**). Se ele pedir um nome para o projeto, use **App NFS-e**.
+1. Na planilha, menu **Extensões > Apps Script**. Abre uma aba nova com um editor de código.
+2. Em outra aba, abra o código pronto:
+   https://raw.githubusercontent.com/nomadcont-beep/appsolicitacaonfs/claude/nfs-request-app-p1kh1a/google/Codigo.gs
+   Aperte **Ctrl+A** (seleciona tudo) e **Ctrl+C** (copia).
+3. Volte ao editor do Apps Script, clique dentro da área de código, aperte **Ctrl+A** e depois **Ctrl+V**.
+   O texto que estava lá (`function myFunction() {...}`) deve sumir e ficar só o código colado.
+4. Aperte **Ctrl+S** para salvar.
 
-## 3. Configurar
-1. Volte à planilha e aperte **F5**. Aparece o menu **NFS-e** no alto.
-2. **NFS-e > Configurar**.
-3. O Google pede autorização. É normal para scripts próprios:
-   **Continuar** → escolha a conta → **Avançado** → **Acessar App NFS-e (não seguro)** → **Permitir**.
-4. Rode **NFS-e > Configurar** de novo, se ele não tiver continuado sozinho.
+## 3. Configurar e autorizar
+1. Na barra de cima do editor há uma caixinha com o nome de uma função, ao lado de **Executar**.
+   Escolha **configurar** nela e clique em **Executar**.
+2. O Google pede autorização. É normal para scripts próprios:
+   **Revisar permissões** → escolha a conta → aparece "O Google não verificou este app" →
+   clique em **Avançado** → **Acessar App NFS-e (não seguro)** → **Permitir**.
+3. Embaixo aparece o registro de execução, terminando em **"Execução concluída"**.
+   Na planilha surge a aba **Pedidos** e, no Drive, a pasta **Pedidos NFS-e (app)**.
 
-Ao terminar, aparece a aba **Pedidos** e, no Drive, a pasta **Pedidos NFS-e (app)**.
+Se pular esta etapa, o script se configura sozinho no primeiro pedido. Mesmo assim, vale fazer
+agora, porque é aqui que você vê se a autorização deu certo.
 
 ## 4. Publicar o script
-1. No Apps Script: **Implantar > Nova implantação**.
-2. Na engrenagem ao lado de "Selecionar tipo", escolha **App da Web**.
+1. No editor, botão azul **Implantar** (canto de cima à direita) → **Nova implantação**.
+2. Clique na engrenagem ao lado de "Selecionar tipo" e escolha **App da Web**.
 3. **Executar como:** Eu. **Quem pode acessar:** Qualquer pessoa.
-4. **Implantar**. Copie o **URL do app da Web** (termina em `/exec`).
-5. Esse endereço vai no `config.js` do app, no campo `apiUrl`. Mande para o Claude ou edite direto no GitHub.
+4. **Implantar**. Se pedir autorização de novo, repita o passo 3.2.
+5. Copie o **URL do app da Web** (começa com `https://script.google.com/macros/s/` e termina em `/exec`).
+6. Mande esse endereço para o Claude, que coloca no app.
+
+## Se travar
+| O que aparece | O que fazer |
+|---|---|
+| Não acho "Extensões" | O menu fica na planilha (não no Drive), entre "Dados" e "Ajuda". |
+| "Este app está bloqueado" | A conta é Google Workspace e o administrador bloqueia scripts. Peça a liberação ao administrador ou use uma conta Gmail do escritório. |
+| Erro "SyntaxError" ao salvar | O código não foi colado inteiro. Repita o passo 2 com Ctrl+A antes de copiar e antes de colar. |
+| A caixinha não mostra "configurar" | Salve (Ctrl+S) e recarregue a página do editor. |
 
 "Qualquer pessoa" significa que o app consegue chamar o script.
 
