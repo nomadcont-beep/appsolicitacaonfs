@@ -699,6 +699,12 @@
   // Início
   // ---------------------------------------------------------------
   $("#nome-escritorio").textContent = CFG.nomeEscritorio || "";
+  if (CFG.logo) {
+    const logo = $("#logo");
+    logo.src = CFG.logo;
+    logo.alt = CFG.nomeEscritorio || "";
+    logo.hidden = false;
+  }
   $$(".aba").forEach((b) => b.addEventListener("click", () => irPara(b.dataset.tela)));
   document.addEventListener("click", (e) => {
     const a = e.target.closest("[data-ir]");

@@ -5,6 +5,9 @@ window.APP_CONFIG = {
   // Nome que aparece no topo do app
   nomeEscritorio: "Nomad Contabilidade",
 
+  // Logo no topo (arquivo nesta pasta, ex.: "logo.png"). Use a versão para fundo escuro. "" = sem logo
+  logo: "",
+
   // E-mail que recebe os pedidos (aparece para o cliente se o envio falhar)
   email: "fiscal@nomadcontabilidade.com.br",
 
