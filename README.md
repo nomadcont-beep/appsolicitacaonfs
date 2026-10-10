@@ -13,6 +13,7 @@ App do cliente  ──pedido + anexos──►  Script Google  ──►  Planil
 ```
 
 - **Frontend** (esta pasta): página estática instalável (PWA), publicada no GitHub Pages.
+  Marca: `logo.png` (recorte de `marca/logo-original.png`), cores laranja `#ff6e00` e grafite `#1f2329`.
 - **Servidor** (`google/Codigo.gs`): Google Apps Script ligado a uma planilha do escritório.
   Instalação em [`google/COMO-INSTALAR.md`](google/COMO-INSTALAR.md).
 

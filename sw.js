@@ -1,8 +1,8 @@
 // Guarda os arquivos do app para abrir rápido e funcionar mesmo com internet instável.
 // Ao alterar qualquer arquivo do app, aumente a versão abaixo para os clientes receberem a atualização.
-const VERSAO = "nfs-v6";
+const VERSAO = "nfs-v7";
 const ARQUIVOS = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.webmanifest",
-  "icons/icon-192.png", "icons/icon-512.png"];
+  "icons/icon-192.png", "icons/icon-512.png", "logo.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(ARQUIVOS)));

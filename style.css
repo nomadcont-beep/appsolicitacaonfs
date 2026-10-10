@@ -31,24 +31,34 @@ body {
   color: var(--texto);
 }
 
-/* Topo */
-.topo { background: var(--grafite); color: #fff; border-bottom: 3px solid var(--laranja); }
+/* Topo: faixa branca com o logo (cores originais) + barra grafite das abas */
+.topo { background: #fff; color: var(--grafite); }
 .topo-conteudo {
-  max-width: 860px; margin: 0 auto; padding: 18px 16px 10px;
+  max-width: 860px; margin: 0 auto; padding: 16px 16px 14px;
   display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
 }
-.marca { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.marca img { height: 40px; width: auto; display: block; }
-.topo h1 { margin: 0; font-size: 1.25rem; font-weight: 600; letter-spacing: .1px; }
-.topo .sub { margin: 2px 0 0; color: var(--laranja); font-size: .85rem; font-weight: 600; letter-spacing: .3px; }
+.marca { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.marca img { height: 46px; width: auto; display: block; }
+.marca img:not([hidden]) + div { border-left: 1px solid var(--borda); padding-left: 16px; }
+.marca img:not([hidden]) + div .sub { display: none; }
+.topo h1 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--grafite); }
+.topo .sub { margin: 2px 0 0; color: var(--laranja-texto); font-size: .85rem; font-weight: 600; }
 
+.barra-abas { background: var(--grafite); border-bottom: 3px solid var(--laranja); }
 .abas { max-width: 860px; margin: 0 auto; padding: 0 16px; display: flex; gap: 2px; overflow-x: auto; }
 .aba {
   background: transparent; color: #c9ced6; border: 0; border-bottom: 3px solid transparent;
-  padding: 10px 14px 9px; margin-bottom: -3px; font: inherit; cursor: pointer; white-space: nowrap;
+  padding: 12px 14px 10px; margin-bottom: -3px; font: inherit; cursor: pointer; white-space: nowrap;
 }
 .aba:hover { color: #fff; }
 .aba.ativa { color: #fff; font-weight: 600; border-bottom-color: var(--laranja); }
+
+@media (max-width: 520px) {
+  .marca { gap: 12px; }
+  .marca img { height: 34px; }
+  .marca img:not([hidden]) + div { padding-left: 12px; }
+  .topo h1 { font-size: .95rem; }
+}
 
 main { max-width: 860px; margin: 0 auto; padding: 20px 16px 32px; }
 
@@ -108,8 +118,6 @@ details.endereco summary { cursor: pointer; color: var(--laranja-texto); font-we
 .btn-primario:hover { background: var(--laranja-hover); }
 .btn-secundario { background: #fff; color: var(--grafite); border-color: var(--borda); }
 .btn-secundario:hover { border-color: var(--grafite); }
-.btn-claro { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .45); }
-.btn-claro:hover { border-color: var(--laranja); color: var(--laranja); }
 .btn-link { background: none; color: var(--suave); text-decoration: underline; }
 .btn-pequeno { padding: 6px 12px; font-size: .85rem; font-weight: 600; }
 
