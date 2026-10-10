@@ -31,7 +31,7 @@
     <!-- ======================= NOVA SOLICITAÇÃO ======================= -->
     <section id="tela-nova" class="tela">
       <div id="aviso-cadastro" class="aviso" hidden>
-        Antes do primeiro pedido, preencha <a href="#" data-ir="dados">Meus dados</a> com o código de acesso enviado pelo escritório.
+        Antes do primeiro pedido, preencha <a href="#" data-ir="dados">Meus dados</a> com o seu nome e as suas empresas.
       </div>
 
       <form id="form-nfs" novalidate>
@@ -208,14 +208,7 @@
     <section id="tela-dados" class="tela" hidden>
       <form id="form-dados" novalidate>
         <fieldset>
-          <legend>Acesso</legend>
-          <div class="linha">
-            <label class="campo">Código de acesso (enviado pelo escritório) *
-              <input name="codigo" id="inp-codigo" required autocomplete="off" placeholder="XXXX-XXXX-XXXX" maxlength="14">
-              <small class="erro" data-erro="codigo"></small>
-              <small class="info" id="codigo-status"></small>
-            </label>
-          </div>
+          <legend>Seus dados</legend>
           <div class="linha">
             <label class="campo largo">Seu nome *
               <input name="contato" required>

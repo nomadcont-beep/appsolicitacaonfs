@@ -16,7 +16,7 @@
       try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem espaço/bloqueado */ }
     },
   };
-  const K = { prestador: "nfs.prestador", tomadores: "nfs.tomadores", rascunho: "nfs.rascunho" };
+  const K = { prestador: "nfs.prestador", tomadores: "nfs.tomadores", rascunho: "nfs.rascunho", pedidos: "nfs.pedidos" };
 
   // ---------------------------------------------------------------
   // CPF / CNPJ (CNPJ alfanumérico conforme IN RFB 2.229/2024)
@@ -134,24 +134,16 @@
   // ---------------------------------------------------------------
   // O corpo vai como texto puro para o navegador não exigir "preflight" de CORS,
   // que o Apps Script não responde.
-  async function api(acao, dados = {}, codigo) {
+  async function api(acao, dados = {}) {
     if (!CFG.apiUrl) throw new Error("App sem endereço do servidor (apiUrl em config.js).");
-    const r = await fetch(CFG.apiUrl, {
-      method: "POST",
-      body: JSON.stringify({ acao, codigo: codigo || prestador()?.codigo, ...dados }),
-    });
+    const r = await fetch(CFG.apiUrl, { method: "POST", body: JSON.stringify({ acao, ...dados }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok) throw new Error(j.erro || `Falha de comunicação (${r.status})`);
     return j;
   }
 
-  const normalizarCodigo = (s) => {
-    const t = String(s || "").toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 12);
-    return t.length === 12 ? t.replace(/(.{4})(.{4})(.{4})/, "$1-$2-$3") : String(s || "").trim().toUpperCase();
-  };
-
   // ---------------------------------------------------------------
-  // Meus dados: código de acesso, contato e empresas (vários CNPJs)
+  // Meus dados: contato e empresas (vários CNPJs)
   // ---------------------------------------------------------------
   const formDados = $("#form-dados");
   const prestador = () => store.get(K.prestador, null);
@@ -172,12 +164,9 @@
 
   function carregarPrestador() {
     const p = prestador() || {};
-    const codigoUrl = new URLSearchParams(location.search).get("codigo");
     const f = formDados.elements;
-    f.codigo.value = codigoUrl ? normalizarCodigo(codigoUrl) : p.codigo || "";
     f.contato.value = p.contato || "";
     f.fone.value = p.fone || "";
-    $("#codigo-status").textContent = p.cliente && f.codigo.value === p.codigo ? `Cliente: ${p.cliente}` : "";
     const box = $("#lista-empresas");
     box.innerHTML = "";
     (p.empresas && p.empresas.length ? p.empresas : [{}]).forEach((emp) => box.appendChild(linhaEmpresa(emp)));
@@ -195,16 +184,12 @@
     $("input", el).focus();
   });
 
-  $("#inp-codigo").addEventListener("blur", (e) => { e.target.value = normalizarCodigo(e.target.value); });
-
-  formDados.addEventListener("submit", async (e) => {
+  formDados.addEventListener("submit", (e) => {
     e.preventDefault();
     const f = formDados.elements;
     let ok = true;
     const chk = (nome, cond, msg) => { marcarErro(formDados, nome, cond ? "" : msg); if (!cond) ok = false; };
 
-    f.codigo.value = normalizarCodigo(f.codigo.value);
-    chk("codigo", /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/.test(f.codigo.value), "Código no formato XXXX-XXXX-XXXX.");
     chk("contato", f.contato.value.trim(), "Informe seu nome.");
 
     const empresas = [];
@@ -225,23 +210,7 @@
       repetido ? "CNPJ repetido." : empresas.length || !empresasOk ? "Confira razão social e CNPJ marcados em vermelho." : "Cadastre ao menos uma empresa.");
     if (!ok) return;
 
-    const btn = $('button[type="submit"]', formDados);
-    btn.disabled = true;
-    btn.textContent = "Verificando código…";
-    let cliente;
-    try {
-      cliente = (await api("validar", {}, f.codigo.value)).cliente;
-    } catch (err) {
-      marcarErro(formDados, "codigo", err.message);
-      return;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Salvar";
-    }
-
-    store.set(K.prestador, {
-      codigo: f.codigo.value, cliente, contato: f.contato.value.trim(), fone: f.fone.value.trim(), empresas,
-    });
+    store.set(K.prestador, { contato: f.contato.value.trim(), fone: f.fone.value.trim(), empresas });
     carregarPrestador();
     toast("Dados salvos.");
     irPara("nova");
@@ -567,7 +536,10 @@
       const anexosB64 = await Promise.all(p.arquivos.map(async (f) => ({
         nome: f.name, tipo: f.type || "application/octet-stream", base64: await lerBase64(f),
       })));
-      await api("enviar", { protocolo: p.protocolo, assunto: assunto(p), texto: p.texto, dados: p.dados, anexos: anexosB64 });
+      await api("enviar", {
+        protocolo: p.protocolo, assunto: assunto(p), texto: p.texto, dados: p.dados, anexos: anexosB64,
+        contato: p.prestador.contato, fone: p.prestador.fone,
+      });
     } catch (err) {
       btn.disabled = false;
       btn.textContent = "Tentar enviar de novo";
@@ -579,6 +551,7 @@
       return;
     }
     if (p.dados.salvarTomador) salvarTomador(p.dados);
+    guardarPedidoLocal(p);
     preencherSelectFrequentes();
     $("#dlg-revisao").close();
     limparForm();
@@ -595,13 +568,23 @@
   // ---------------------------------------------------------------
   // Minhas notas (lista vinda do escritório)
   // ---------------------------------------------------------------
+  // O servidor não devolve os dados completos do tomador; para "Pedir outra igual"
+  // usamos a cópia guardada neste computador no momento do envio.
+  function guardarPedidoLocal(p) {
+    const mapa = store.get(K.pedidos, {});
+    mapa[p.protocolo] = p.dados;
+    const chaves = Object.keys(mapa);
+    chaves.slice(0, Math.max(0, chaves.length - 200)).forEach((k) => delete mapa[k]);
+    store.set(K.pedidos, mapa);
+  }
+
   const classeStatus = (s) =>
     /emitida/i.test(s) ? "emitida" : /pendente/i.test(s) ? "pendente" : /cancel/i.test(s) ? "cancelado" : "";
 
-  async function abrirNota(protocolo, arquivo, baixar) {
+  async function abrirNota(pedido, arquivo, baixar) {
     toast("Abrindo nota…");
     try {
-      const j = await api("baixar", { protocolo, arquivoId: arquivo.id });
+      const j = await api("baixar", { protocolo: pedido.protocolo, cnpj: pedido.cnpjEmitente, arquivoId: arquivo.id });
       const bytes = Uint8Array.from(atob(j.base64), (c) => c.charCodeAt(0));
       const url = URL.createObjectURL(new Blob([bytes], { type: j.tipo || "application/pdf" }));
       if (baixar) {
@@ -624,7 +607,7 @@
     box.innerHTML = '<p class="dica">Carregando…</p>';
     let pedidos;
     try {
-      pedidos = (await api("listar")).pedidos;
+      pedidos = (await api("listar", { cnpjs: prestador().empresas.map((e) => e.cnpj) })).pedidos;
     } catch (err) {
       box.innerHTML = "";
       const p = document.createElement("p");
@@ -661,20 +644,21 @@
         p.notas.forEach((n) => {
           const linha = el("div", "nota");
           const ver = el("button", "btn btn-primario btn-pequeno", "Ver PDF");
-          ver.onclick = () => abrirNota(p.protocolo, n, false);
+          ver.onclick = () => abrirNota(p, n, false);
           const baixar = el("button", "btn btn-secundario btn-pequeno", "Baixar");
-          baixar.onclick = () => abrirNota(p.protocolo, n, true);
+          baixar.onclick = () => abrirNota(p, n, true);
           linha.append(el("span", "nome", n.nome), ver, baixar);
           notas.appendChild(linha);
         });
         item.appendChild(notas);
       }
 
-      if (p.dados && p.dados.tomadorNome) {
+      const dadosLocais = store.get(K.pedidos, {})[p.protocolo];
+      if (dadosLocais) {
         const acoes = el("div", "acoes");
         const repetir = el("button", "btn btn-secundario btn-pequeno", "Pedir outra igual");
         repetir.onclick = () => {
-          const d = { ...p.dados, competencia: hojeISO(), vencimento: "" };
+          const d = { ...dadosLocais, competencia: hojeISO(), vencimento: "" };
           irPara("nova");
           limparForm();
           preencherForm(d);
@@ -726,8 +710,7 @@
   form.elements.competencia.value = hojeISO();
   const rascunho = store.get(K.rascunho, null);
   if (rascunho) preencherForm(rascunho);
-  const codigoNovo = new URLSearchParams(location.search).get("codigo");
-  if (!prestador() || (codigoNovo && normalizarCodigo(codigoNovo) !== prestador().codigo)) irPara("dados");
+  if (!prestador()) irPara("dados");
 
   // Exposto só para testes automatizados
   window.__nfs = { cpfValido, cnpjValido, lerValor, montarTexto };

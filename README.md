@@ -18,7 +18,7 @@ App do cliente  ──pedido + anexos──►  Script Google  ──►  Planil
 
 ## O que o cliente faz
 
-- **Meus dados:** código de acesso (gerado pelo escritório), nome, telefone e **uma ou várias empresas** (CNPJs).
+- **Meus dados:** nome, telefone e **uma ou várias empresas** (CNPJs).
 - **Nova solicitação:**
   - empresa que emite (quando houver mais de uma);
   - tomador: CPF/CNPJ (validado, aceita o CNPJ alfanumérico), nome, e-mail, telefone e endereço (busca pelo CEP);
@@ -32,9 +32,10 @@ local da prestação e CNO (quando for obra).
 
 ## Segurança
 
-- Cada cliente tem um código de acesso próprio e só vê os próprios pedidos e notas.
-  O escritório bloqueia um cliente na planilha (coluna Ativo = Não).
-- O script só entrega arquivos da pasta "NFS-e emitida" do pedido daquele cliente.
+- **Sem senha nem código de acesso** (decisão do escritório): o app identifica o cliente pelos CNPJs
+  cadastrados. Quem souber um CNPJ vê os pedidos daquele CNPJ (tomador, valor, status) e baixa os PDFs.
+- Para reduzir a exposição, o script **não devolve** endereço, e-mail e telefone dos tomadores nem
+  os anexos do cliente; só entrega arquivos da pasta "NFS-e emitida" do pedido.
 - Texto vindo do app não vira fórmula na planilha.
 - No computador do cliente ficam só os dados dele (empresas e tomadores frequentes).
 
@@ -46,7 +47,7 @@ Em `config.js`: nome do escritório, e-mail, `apiUrl` (endereço `/exec` do scri
 
 1. GitHub Pages: Settings > Pages > Deploy from a branch > `claude/nfs-request-app-p1kh1a` / root.
    Endereço: `https://nomadcont-beep.github.io/appsolicitacaonfs/`
-2. Escritório: na planilha, **NFS-e > Novo cliente**, e manda o link com o código ao cliente.
+2. Escritório manda o link ao cliente.
 3. Cliente: abre o link no **Chrome ou Edge**, preenche Meus dados e clica em **"Instalar na área de trabalho"**.
 
 Ao alterar arquivos depois de publicado, aumente `VERSAO` em `sw.js` para os clientes receberem a atualização.

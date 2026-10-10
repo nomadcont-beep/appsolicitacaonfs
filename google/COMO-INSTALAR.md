@@ -18,13 +18,12 @@ O app do cliente conversa com os dois por meio de um script (Apps Script).
 
 ## 3. Configurar
 1. Volte à planilha e aperte **F5**. Aparece o menu **NFS-e** no alto.
-2. **NFS-e > 1. Configurar**.
+2. **NFS-e > Configurar**.
 3. O Google pede autorização. É normal para scripts próprios:
    **Continuar** → escolha a conta → **Avançado** → **Acessar App NFS-e (não seguro)** → **Permitir**.
-4. Rode **NFS-e > 1. Configurar** de novo, se ele não tiver continuado sozinho.
-5. Quando pedir o endereço do app, cole `https://nomadcont-beep.github.io/appsolicitacaonfs/`.
+4. Rode **NFS-e > Configurar** de novo, se ele não tiver continuado sozinho.
 
-Ao terminar, aparecem as abas **Clientes** e **Pedidos**, e no Drive a pasta **Pedidos NFS-e (app)**.
+Ao terminar, aparece a aba **Pedidos** e, no Drive, a pasta **Pedidos NFS-e (app)**.
 
 ## 4. Publicar o script
 1. No Apps Script: **Implantar > Nova implantação**.
@@ -33,13 +32,18 @@ Ao terminar, aparecem as abas **Clientes** e **Pedidos**, e no Drive a pasta **P
 4. **Implantar**. Copie o **URL do app da Web** (termina em `/exec`).
 5. Esse endereço vai no `config.js` do app, no campo `apiUrl`. Mande para o Claude ou edite direto no GitHub.
 
-"Qualquer pessoa" significa que o app consegue chamar o script. Os dados continuam protegidos
-pelo código de acesso de cada cliente: sem código válido, o script não responde nada.
+"Qualquer pessoa" significa que o app consegue chamar o script.
+
+> **Atenção (decisão do escritório):** não há senha nem código de acesso. O app identifica o
+> cliente pelos CNPJs cadastrados em "Meus dados". Quem souber o CNPJ de um cliente consegue
+> ver a lista de pedidos dele (tomador, valor, status) e baixar os PDFs das notas.
+> Endereço, e-mail e telefone dos tomadores e os anexos enviados pelo cliente **não** são
+> devolvidos pelo app — ficam só na planilha e no Drive do escritório.
 
 ## Dia a dia
 
-**Cadastrar um cliente:** **NFS-e > Novo cliente**, digite o nome. Aparece o código e o link.
-Mande o link ao cliente: ao abrir, o código já vem preenchido.
+**Cadastrar um cliente:** não precisa. Mande o link do app; o cliente preenche nome e CNPJs
+em "Meus dados" e instala na área de trabalho.
 
 **Quando chega um pedido:**
 1. O e-mail chega em fiscal@ com os anexos e o link da pasta do pedido.
@@ -50,8 +54,6 @@ Mande o link ao cliente: ao abrir, o código já vem preenchido.
 **Status e recados:** na aba **Pedidos**, a coluna **Status** tem as opções Recebido / Em emissão /
 Pendente / Emitida / Cancelado. O que for escrito em **Mensagem ao cliente** aparece no app
 (ex.: "Falta o número da ART").
-
-**Bloquear um cliente:** aba **Clientes**, coluna **Ativo** = Não.
 
 **Atualizar o script** (quando houver versão nova): cole o novo código, salve e vá em
 **Implantar > Gerenciar implantações > lápis (editar) > Versão: Nova versão > Implantar**.

@@ -4,8 +4,12 @@
  * O que faz:
  *  - recebe os pedidos do app, grava na aba "Pedidos", cria uma pasta no Drive para cada pedido
  *    (com os anexos do cliente) e manda um e-mail para o escritório;
- *  - devolve ao cliente a lista dos pedidos dele, com status e os PDFs que o escritório colocou
- *    na subpasta "NFS-e emitida" de cada pedido.
+ *  - devolve ao app a lista de pedidos dos CNPJs cadastrados nele, com status e os PDFs que o
+ *    escritório colocou na subpasta "NFS-e emitida" de cada pedido.
+ *
+ * Atenção: não há senha nem código de acesso. Quem informar um CNPJ vê os pedidos e as notas
+ * daquele CNPJ (decisão do escritório). Por isso a lista devolve só o mínimo: tomador, valor,
+ * status, recado e PDFs — endereço, e-mail e telefone dos tomadores ficam só na planilha.
  *
  * Instalação: veja google/COMO-INSTALAR.md
  */
@@ -16,16 +20,15 @@ const NOME_PASTA_RAIZ = 'Pedidos NFS-e (app)';
 const MAX_ANEXOS = 5;
 const MAX_BYTES_ANEXOS = 10 * 1024 * 1024; // 10 MB somando todos
 const MAX_PEDIDOS_LISTADOS = 60;
+const MAX_CNPJS_POR_CONSULTA = 20;
 // ========================================================
 
-const ABA_CLIENTES = 'Clientes';
 const ABA_PEDIDOS = 'Pedidos';
 const PASTA_ANEXOS = 'Anexos do cliente';
 const PASTA_NFS = 'NFS-e emitida';
 const STATUS = ['Recebido', 'Em emissão', 'Pendente (ver mensagem)', 'Emitida', 'Cancelado'];
 
-const COL_CLIENTES = ['Código de acesso', 'Cliente', 'Ativo', 'Criado em', 'Observações'];
-const COL_PEDIDOS = ['Data', 'Protocolo', 'Código', 'Cliente', 'Emitente', 'CNPJ emitente', 'Tomador',
+const COL_PEDIDOS = ['Data', 'Protocolo', 'Emitente', 'CNPJ emitente', 'Solicitante', 'Tomador',
   'CPF/CNPJ tomador', 'Valor', 'Urgente', 'Status', 'Mensagem ao cliente', 'Pasta no Drive', 'ID pasta NFS', 'Dados'];
 const C = Object.fromEntries(COL_PEDIDOS.map((n, i) => [n, i]));
 
@@ -34,8 +37,7 @@ const C = Object.fromEntries(COL_PEDIDOS.map((n, i) => [n, i]));
 // ---------------------------------------------------------------------------
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('NFS-e')
-    .addItem('1. Configurar (só na primeira vez)', 'configurar')
-    .addItem('Novo cliente (gera código de acesso)', 'novoCliente')
+    .addItem('Configurar (só na primeira vez)', 'configurar')
     .addToUi();
 }
 
@@ -43,25 +45,14 @@ function configurar() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const props = PropertiesService.getScriptProperties();
 
-  let cli = ss.getSheetByName(ABA_CLIENTES) || ss.insertSheet(ABA_CLIENTES);
-  if (cli.getLastRow() === 0) {
-    cli.appendRow(COL_CLIENTES);
-    cli.getRange(1, 1, 1, COL_CLIENTES.length).setFontWeight('bold');
-    cli.setFrozenRows(1);
-    cli.getRange('A:A').setNumberFormat('@');
-    cli.getRange('C2:C').setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(['Sim', 'Não']).build());
-  }
-
   let ped = ss.getSheetByName(ABA_PEDIDOS) || ss.insertSheet(ABA_PEDIDOS);
   if (ped.getLastRow() === 0) {
     ped.appendRow(COL_PEDIDOS);
     ped.getRange(1, 1, 1, COL_PEDIDOS.length).setFontWeight('bold');
     ped.setFrozenRows(1);
-    ped.getRange('B:C').setNumberFormat('@');   // protocolo e código sempre como texto
+    ped.getRange('B:B').setNumberFormat('@'); // protocolo sempre como texto
     ped.getRange(1, C['Valor'] + 1, ped.getMaxRows(), 1).setNumberFormat('"R$" #,##0.00');
-    const colStatus = C['Status'] + 1;
-    ped.getRange(2, colStatus, ped.getMaxRows() - 1, 1).setDataValidation(
+    ped.getRange(2, C['Status'] + 1, ped.getMaxRows() - 1, 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(STATUS).build());
     ped.hideColumns(C['ID pasta NFS'] + 1, 2); // colunas técnicas
   }
@@ -71,29 +62,8 @@ function configurar() {
   }
   props.setProperty('PLANILHA', ss.getId());
 
-  const ui = SpreadsheetApp.getUi();
-  const r = ui.prompt('Endereço do app',
-    'Cole o endereço onde o app está publicado (ex.: https://nomadcont-beep.github.io/appsolicitacaonfs/).\n' +
-    'Ele é usado para montar o link que você manda para cada cliente. Pode deixar em branco.',
-    ui.ButtonSet.OK);
-  if (r.getSelectedButton() === ui.Button.OK && r.getResponseText().trim()) {
-    props.setProperty('APP_URL', r.getResponseText().trim());
-  }
-  ui.alert('Pronto. Abas e pasta "' + NOME_PASTA_RAIZ + '" criadas no seu Google Drive.\n\n' +
+  SpreadsheetApp.getUi().alert('Pronto. Aba "Pedidos" e pasta "' + NOME_PASTA_RAIZ + '" criadas no seu Google Drive.\n\n' +
     'Agora publique o script: Implantar > Nova implantação > App da Web.');
-}
-
-function novoCliente() {
-  const ui = SpreadsheetApp.getUi();
-  const r = ui.prompt('Novo cliente', 'Nome do cliente (como vocês o identificam):', ui.ButtonSet.OK_CANCEL);
-  if (r.getSelectedButton() !== ui.Button.OK || !r.getResponseText().trim()) return;
-
-  const codigo = gerarCodigo_();
-  abrirAba_(ABA_CLIENTES).appendRow([codigo, celula_(r.getResponseText().trim()), 'Sim', new Date(), '']);
-
-  const appUrl = PropertiesService.getScriptProperties().getProperty('APP_URL');
-  const link = appUrl ? appUrl + (appUrl.indexOf('?') < 0 ? '?' : '&') + 'codigo=' + codigo : '';
-  ui.alert('Código de acesso: ' + codigo + (link ? '\n\nLink para enviar ao cliente:\n' + link : ''));
 }
 
 // ---------------------------------------------------------------------------
@@ -102,14 +72,10 @@ function novoCliente() {
 function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents);
-    const cliente = buscarCliente_(req.codigo);
-    if (!cliente) return json_({ ok: false, erro: 'Código de acesso inválido. Fale com o escritório.' });
-
     switch (req.acao) {
-      case 'validar': return json_({ ok: true, cliente: cliente.nome });
-      case 'enviar': return json_(enviarPedido_(cliente, req));
-      case 'listar': return json_(listarPedidos_(cliente));
-      case 'baixar': return json_(baixarNota_(cliente, req));
+      case 'enviar': return json_(enviarPedido_(req));
+      case 'listar': return json_(listarPedidos_(req));
+      case 'baixar': return json_(baixarNota_(req));
       default: return json_({ ok: false, erro: 'Ação desconhecida' });
     }
   } catch (err) {
@@ -122,10 +88,11 @@ function doGet() {
   return json_({ ok: true, servico: 'Solicitar NFS-e' });
 }
 
-function enviarPedido_(cliente, req) {
+function enviarPedido_(req) {
   const d = req.dados || {};
   const protocolo = String(req.protocolo || '').replace(/[^0-9A-Z-]/gi, '').slice(0, 30);
-  if (!protocolo || !req.texto || !d.tomadorNome || !d.emitenteCnpj) {
+  const cnpj = soDoc_(d.emitenteCnpj);
+  if (!protocolo || !req.texto || !d.tomadorNome || cnpj.length !== 14) {
     return { ok: false, erro: 'Pedido incompleto.' };
   }
 
@@ -146,23 +113,24 @@ function enviarPedido_(cliente, req) {
   try {
     const aba = abrirAba_(ABA_PEDIDOS);
     // Reenvio do mesmo pedido (ex.: internet caiu na resposta): não duplica
-    if (acharLinha_(aba, protocolo, cliente.codigo)) return { ok: true, protocolo: protocolo, repetido: true };
+    if (acharLinha_(aba, protocolo, cnpj)) return { ok: true, protocolo: protocolo, repetido: true };
 
-    const pastaCliente = subpasta_(DriveApp.getFolderById(prop_('PASTA_RAIZ')), cliente.nome + ' [' + cliente.codigo + ']');
-    const pastaPedido = pastaCliente.createFolder(protocolo + ' - ' + String(d.tomadorNome).slice(0, 60));
+    const nomeEmpresa = String(d.emitenteRazao || '').replace(/[\\/]/g, '-').slice(0, 80) + ' [' + cnpj + ']';
+    const pastaEmpresa = subpasta_(DriveApp.getFolderById(prop_('PASTA_RAIZ')), nomeEmpresa);
+    const pastaPedido = pastaEmpresa.createFolder(protocolo + ' - ' + String(d.tomadorNome).slice(0, 60));
     const pastaAnexos = pastaPedido.createFolder(PASTA_ANEXOS);
     const pastaNfs = pastaPedido.createFolder(PASTA_NFS);
     blobs.forEach(function (b) { pastaAnexos.createFile(b); });
 
+    const solicitante = [req.contato, req.fone].filter(Boolean).join(' — ');
     aba.appendRow([
-      new Date(), protocolo, cliente.codigo, celula_(cliente.nome), celula_(d.emitenteRazao), celula_(d.emitenteCnpj),
+      new Date(), protocolo, celula_(d.emitenteRazao), celula_(d.emitenteCnpj), celula_(solicitante),
       celula_(d.tomadorNome), celula_(d.tomadorDoc), Number(d.valorNumero) || celula_(d.valor),
       d.urgente ? 'Sim' : '', 'Recebido', '', pastaPedido.getUrl(), pastaNfs.getId(), JSON.stringify(d),
     ]);
 
     const assunto = String(req.assunto || ('Pedido NFS-e ' + protocolo)).slice(0, 200);
-    const corpo = req.texto + '\n\n--\nCliente: ' + cliente.nome +
-      '\nPasta do pedido: ' + pastaPedido.getUrl() +
+    const corpo = req.texto + '\n\n--\nPasta do pedido: ' + pastaPedido.getUrl() +
       '\nColoque o PDF da nota na subpasta "' + PASTA_NFS + '" para o cliente ver no app.';
     MailApp.sendEmail({ to: EMAIL_ESCRITORIO, subject: assunto, body: corpo, name: 'App NFS-e', attachments: blobs });
 
@@ -172,12 +140,19 @@ function enviarPedido_(cliente, req) {
   }
 }
 
-function listarPedidos_(cliente) {
+function listarPedidos_(req) {
+  const cnpjs = {};
+  (req.cnpjs || []).slice(0, MAX_CNPJS_POR_CONSULTA).forEach(function (c) {
+    c = soDoc_(c);
+    if (c.length === 14) cnpjs[c] = true;
+  });
+  if (!Object.keys(cnpjs).length) return { ok: false, erro: 'Nenhum CNPJ informado.' };
+
   const aba = abrirAba_(ABA_PEDIDOS);
   const n = aba.getLastRow() - 1;
   if (n < 1) return { ok: true, pedidos: [] };
   const linhas = aba.getRange(2, 1, n, COL_PEDIDOS.length).getValues()
-    .filter(function (l) { return l[C['Código']] === cliente.codigo; })
+    .filter(function (l) { return cnpjs[soDoc_(l[C['CNPJ emitente']])]; })
     .slice(-MAX_PEDIDOS_LISTADOS)
     .reverse();
 
@@ -192,27 +167,25 @@ function listarPedidos_(cliente) {
     } catch (err) { /* pasta apagada: segue sem notas */ }
     let status = l[C['Status']] || 'Recebido';
     if (notas.length && status !== 'Cancelado') status = 'Emitida';
-    let dados = {};
-    try { dados = JSON.parse(l[C['Dados']] || '{}'); } catch (err) { /* ignora */ }
     return {
       protocolo: l[C['Protocolo']],
       data: l[C['Data']] instanceof Date ? l[C['Data']].toISOString() : String(l[C['Data']]),
       emitente: l[C['Emitente']],
+      cnpjEmitente: l[C['CNPJ emitente']],
       tomador: l[C['Tomador']],
       valor: l[C['Valor']],
       status: status,
       mensagem: l[C['Mensagem ao cliente']],
       notas: notas,
-      dados: dados,
     };
   });
   return { ok: true, pedidos: pedidos };
 }
 
-function baixarNota_(cliente, req) {
-  const linha = acharLinha_(abrirAba_(ABA_PEDIDOS), String(req.protocolo || ''), cliente.codigo);
+function baixarNota_(req) {
+  const linha = acharLinha_(abrirAba_(ABA_PEDIDOS), String(req.protocolo || ''), soDoc_(req.cnpj));
   if (!linha) return { ok: false, erro: 'Pedido não encontrado.' };
-  // Só entrega arquivos que estão na pasta de NFS-e deste pedido, deste cliente
+  // Só entrega arquivos da pasta "NFS-e emitida" deste pedido (nunca os anexos do cliente)
   const it = DriveApp.getFolderById(linha[C['ID pasta NFS']]).getFiles();
   while (it.hasNext()) {
     const f = it.next();
@@ -227,34 +200,18 @@ function baixarNota_(cliente, req) {
 // ---------------------------------------------------------------------------
 // Apoio
 // ---------------------------------------------------------------------------
-function buscarCliente_(codigo) {
-  codigo = String(codigo || '').trim().toUpperCase();
-  if (!/^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/.test(codigo)) return null;
-  const aba = abrirAba_(ABA_CLIENTES);
-  const n = aba.getLastRow() - 1;
-  if (n < 1) return null;
-  const linhas = aba.getRange(2, 1, n, 3).getValues();
-  for (let i = 0; i < linhas.length; i++) {
-    if (String(linhas[i][0]).trim().toUpperCase() === codigo && linhas[i][2] !== 'Não') {
-      return { codigo: codigo, nome: String(linhas[i][1]) };
-    }
-  }
-  return null;
+function soDoc_(s) {
+  return String(s || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
 }
 
-function acharLinha_(aba, protocolo, codigo) {
+function acharLinha_(aba, protocolo, cnpj) {
   const n = aba.getLastRow() - 1;
-  if (n < 1) return null;
+  if (n < 1 || !protocolo || cnpj.length !== 14) return null;
   const linhas = aba.getRange(2, 1, n, COL_PEDIDOS.length).getValues();
   for (let i = linhas.length - 1; i >= 0; i--) {
-    if (linhas[i][C['Protocolo']] === protocolo && linhas[i][C['Código']] === codigo) return linhas[i];
+    if (linhas[i][C['Protocolo']] === protocolo && soDoc_(linhas[i][C['CNPJ emitente']]) === cnpj) return linhas[i];
   }
   return null;
-}
-
-function gerarCodigo_() {
-  const hex = Utilities.getUuid().replace(/-/g, '').toUpperCase(); // UUID v4: aleatório
-  return hex.slice(0, 4) + '-' + hex.slice(4, 8) + '-' + hex.slice(8, 12);
 }
 
 function subpasta_(pai, nome) {

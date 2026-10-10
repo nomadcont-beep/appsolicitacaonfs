@@ -1,6 +1,6 @@
 // Guarda os arquivos do app para abrir rápido e funcionar mesmo com internet instável.
 // Ao alterar qualquer arquivo do app, aumente a versão abaixo para os clientes receberem a atualização.
-const VERSAO = "nfs-v3";
+const VERSAO = "nfs-v4";
 const ARQUIVOS = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png"];
 
