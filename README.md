@@ -1,41 +1,53 @@
 # Solicitar NFS-e
 
-App para o cliente do escritório pedir a emissão de nota fiscal de serviço.
-O cliente abre pelo ícone na área de trabalho, preenche o pedido e clica em enviar.
-O pedido chega por e-mail em **fiscal@nomadcontabilidade.com.br**.
+App para o cliente do escritório pedir a emissão de nota fiscal de serviço e receber o PDF da nota.
+O cliente abre pelo ícone na área de trabalho, preenche o pedido, anexa documentos e envia.
+O escritório recebe por e-mail em **fiscal@nomadcontabilidade.com.br**, emite e salva o PDF no Google Drive.
+A nota aparece para o cliente em **Minhas notas**.
 
-## O que o cliente preenche
+## Como funciona
 
-- **Tomador:** CPF/CNPJ (validado, aceita o CNPJ alfanumérico), nome, e-mail, telefone, endereço (busca pelo CEP)
-- **Serviço:** descrição, valor, data de competência, cidade da prestação e, se for obra de construção civil, o código da obra (CNO)
-- **Retenções:** não / sim (ISS, IR, INSS, PIS/COFINS/CSLL) / não sei
-- **Pagamento e observações:** vencimento, informações extras na nota, urgência
+```
+App do cliente  ──pedido + anexos──►  Script Google  ──►  Planilha "Pedidos" + pasta no Drive + e-mail fiscal@
+                ◄──status + PDF────                 ◄──  escritório salva o PDF em "NFS-e emitida"
+```
 
-Também tem:
-- **Clientes guardados:** o tomador fica salvo e é escolhido numa lista no próximo pedido
-- **Histórico** com protocolo, "Pedir outra igual" (para notas mensais repetidas) e reenvio se a internet falhar
-- **Rascunho automático:** se fechar sem querer, o que foi digitado não se perde
+- **Frontend** (esta pasta): página estática instalável (PWA), publicada no GitHub Pages.
+- **Servidor** (`google/Codigo.gs`): Google Apps Script ligado a uma planilha do escritório.
+  Instalação em [`google/COMO-INSTALAR.md`](google/COMO-INSTALAR.md).
 
-Os dados ficam só no computador do cliente. O escritório recebe apenas o e-mail.
+## O que o cliente faz
+
+- **Meus dados:** código de acesso (gerado pelo escritório), nome, telefone e **uma ou várias empresas** (CNPJs).
+- **Nova solicitação:**
+  - empresa que emite (quando houver mais de uma);
+  - tomador: CPF/CNPJ (validado, aceita o CNPJ alfanumérico), nome, e-mail, telefone e endereço (busca pelo CEP);
+  - serviço: descrição, valor, competência, local da prestação e, se for obra, o código da obra (CNO);
+  - retenções, vencimento, informações extras na nota, observações e urgência;
+  - **anexos:** até 5 arquivos, 10 MB no total.
+- **Minhas notas:** status de cada pedido, recados do escritório, **PDF da nota** (ver e baixar) e "Pedir outra igual".
+
+Obrigatórios: empresa emitente, CPF/CNPJ e nome do tomador, descrição, valor, competência,
+local da prestação e CNO (quando for obra).
+
+## Segurança
+
+- Cada cliente tem um código de acesso próprio e só vê os próprios pedidos e notas.
+  O escritório bloqueia um cliente na planilha (coluna Ativo = Não).
+- O script só entrega arquivos da pasta "NFS-e emitida" do pedido daquele cliente.
+- Texto vindo do app não vira fórmula na planilha.
+- No computador do cliente ficam só os dados dele (empresas e tomadores frequentes).
 
 ## Configuração
 
-Tudo fica em `config.js`: nome do escritório, e-mail, forma de envio e prazo.
-
-### Forma de envio
-
-| `envio` | Como funciona | Quando usar |
-|---|---|---|
-| `"formsubmit"` | Serviço gratuito FormSubmit.co envia o e-mail | Para começar já. No **1º pedido** chega um e-mail de ativação em fiscal@: clique em *Activate* uma vez. Os dados passam por um terceiro. |
-| `"enviar.php"` | Script próprio na sua hospedagem envia o e-mail | **Recomendado** assim que estiver hospedado (Hostinger etc.). Não passa por terceiro. Ajuste `REMETENTE` no `enviar.php` para uma caixa que exista no seu domínio. |
+Em `config.js`: nome do escritório, e-mail, `apiUrl` (endereço `/exec` do script do Google) e prazo.
 
 ## Publicar e instalar no cliente
 
-1. Hospede a pasta em um endereço **https** (Hostinger, por ex. `nfs.nomadcontabilidade.com.br`).
-2. No computador do cliente, abra o endereço no **Chrome ou Edge** e clique em **"Instalar na área de trabalho"**
-   (ou no ícone de instalar na barra de endereço). Fica um ícone na área de trabalho e o app abre em janela própria.
-3. Opcional: mande o link já com os dados da empresa do cliente, para ele não digitar:
-   `https://seu-endereco/?razao=Empresa%20X%20Ltda&cnpj=11222333000181&contato=Maria`
+1. GitHub Pages: Settings > Pages > Deploy from a branch > `claude/nfs-request-app-p1kh1a` / root.
+   Endereço: `https://nomadcont-beep.github.io/appsolicitacaonfs/`
+2. Escritório: na planilha, **NFS-e > Novo cliente**, e manda o link com o código ao cliente.
+3. Cliente: abre o link no **Chrome ou Edge**, preenche Meus dados e clica em **"Instalar na área de trabalho"**.
 
 Ao alterar arquivos depois de publicado, aumente `VERSAO` em `sw.js` para os clientes receberem a atualização.
 

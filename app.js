@@ -16,7 +16,7 @@
       try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem espaço/bloqueado */ }
     },
   };
-  const K = { prestador: "nfs.prestador", tomadores: "nfs.tomadores", historico: "nfs.historico", rascunho: "nfs.rascunho" };
+  const K = { prestador: "nfs.prestador", tomadores: "nfs.tomadores", rascunho: "nfs.rascunho" };
 
   // ---------------------------------------------------------------
   // CPF / CNPJ (CNPJ alfanumérico conforme IN RFB 2.229/2024)
@@ -81,7 +81,9 @@
   function gerarProtocolo() {
     const d = new Date();
     const p = (n, t = 2) => String(n).padStart(t, "0");
-    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+    // Sufixo aleatório evita colisão entre dois clientes no mesmo segundo
+    const sufixo = Array.from(crypto.getRandomValues(new Uint8Array(2)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${sufixo}`;
   }
 
   // ---------------------------------------------------------------
@@ -126,46 +128,134 @@
     toast("Texto copiado.");
   }
 
+
   // ---------------------------------------------------------------
-  // Meus dados (prestador)
+  // Comunicação com o escritório (Google Apps Script)
+  // ---------------------------------------------------------------
+  // O corpo vai como texto puro para o navegador não exigir "preflight" de CORS,
+  // que o Apps Script não responde.
+  async function api(acao, dados = {}, codigo) {
+    if (!CFG.apiUrl) throw new Error("App sem endereço do servidor (apiUrl em config.js).");
+    const r = await fetch(CFG.apiUrl, {
+      method: "POST",
+      body: JSON.stringify({ acao, codigo: codigo || prestador()?.codigo, ...dados }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.erro || `Falha de comunicação (${r.status})`);
+    return j;
+  }
+
+  const normalizarCodigo = (s) => {
+    const t = String(s || "").toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 12);
+    return t.length === 12 ? t.replace(/(.{4})(.{4})(.{4})/, "$1-$2-$3") : String(s || "").trim().toUpperCase();
+  };
+
+  // ---------------------------------------------------------------
+  // Meus dados: código de acesso, contato e empresas (vários CNPJs)
   // ---------------------------------------------------------------
   const formDados = $("#form-dados");
+  const prestador = () => store.get(K.prestador, null);
+
+  function linhaEmpresa(emp = {}) {
+    const el = $("#tpl-empresa").content.firstElementChild.cloneNode(true);
+    $('[data-campo="razao"]', el).value = emp.razao || "";
+    $('[data-campo="cnpj"]', el).value = emp.cnpj || "";
+    $('[data-campo="cnpj"]', el).addEventListener("blur", (e) => {
+      if (e.target.value.trim()) e.target.value = formatarDoc(e.target.value);
+    });
+    $(".btn-remover", el).onclick = () => {
+      el.remove();
+      if (!$("#lista-empresas").children.length) $("#lista-empresas").appendChild(linhaEmpresa());
+    };
+    return el;
+  }
 
   function carregarPrestador() {
-    const p = store.get(K.prestador, null);
-    // Permite o escritório mandar um link já preenchido: ?razao=...&cnpj=...&contato=...
-    const qs = new URLSearchParams(location.search);
-    const daUrl = {};
-    for (const c of ["razao", "cnpj", "contato", "fone"]) if (qs.get(c)) daUrl[c] = qs.get(c);
-    const dados = { ...(p || {}), ...daUrl };
-    for (const [k, v] of Object.entries(dados)) if (formDados.elements[k]) formDados.elements[k].value = v;
-    if (!p && daUrl.razao && daUrl.cnpj && daUrl.contato && cnpjValido(soDoc(daUrl.cnpj))) {
-      store.set(K.prestador, { ...daUrl, cnpj: formatarDoc(daUrl.cnpj) });
-    }
+    const p = prestador() || {};
+    const codigoUrl = new URLSearchParams(location.search).get("codigo");
+    const f = formDados.elements;
+    f.codigo.value = codigoUrl ? normalizarCodigo(codigoUrl) : p.codigo || "";
+    f.contato.value = p.contato || "";
+    f.fone.value = p.fone || "";
+    $("#codigo-status").textContent = p.cliente && f.codigo.value === p.codigo ? `Cliente: ${p.cliente}` : "";
+    const box = $("#lista-empresas");
+    box.innerHTML = "";
+    (p.empresas && p.empresas.length ? p.empresas : [{}]).forEach((emp) => box.appendChild(linhaEmpresa(emp)));
     atualizarAvisoCadastro();
+    preencherEmitentes();
   }
 
   function atualizarAvisoCadastro() {
-    $("#aviso-cadastro").hidden = !!store.get(K.prestador, null);
+    $("#aviso-cadastro").hidden = !!prestador();
   }
 
-  formDados.addEventListener("submit", (e) => {
+  $("#btn-add-empresa").addEventListener("click", () => {
+    const el = linhaEmpresa();
+    $("#lista-empresas").appendChild(el);
+    $("input", el).focus();
+  });
+
+  $("#inp-codigo").addEventListener("blur", (e) => { e.target.value = normalizarCodigo(e.target.value); });
+
+  formDados.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = formDados.elements;
     let ok = true;
     const chk = (nome, cond, msg) => { marcarErro(formDados, nome, cond ? "" : msg); if (!cond) ok = false; };
-    chk("razao", f.razao.value.trim(), "Informe a razão social.");
-    chk("cnpj", cnpjValido(soDoc(f.cnpj.value)), "CNPJ inválido.");
+
+    f.codigo.value = normalizarCodigo(f.codigo.value);
+    chk("codigo", /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/.test(f.codigo.value), "Código no formato XXXX-XXXX-XXXX.");
     chk("contato", f.contato.value.trim(), "Informe seu nome.");
-    if (!ok) return;
-    f.cnpj.value = formatarDoc(f.cnpj.value);
-    store.set(K.prestador, {
-      razao: f.razao.value.trim(), cnpj: f.cnpj.value, contato: f.contato.value.trim(), fone: f.fone.value.trim(),
+
+    const empresas = [];
+    let empresasOk = true;
+    $$("#lista-empresas .empresa").forEach((el) => {
+      const razao = $('[data-campo="razao"]', el);
+      const cnpj = $('[data-campo="cnpj"]', el);
+      const vazia = !razao.value.trim() && !cnpj.value.trim();
+      const cnpjOk = cnpjValido(soDoc(cnpj.value));
+      razao.classList.toggle("invalido", !vazia && !razao.value.trim());
+      cnpj.classList.toggle("invalido", !vazia && !cnpjOk);
+      if (vazia) return;
+      if (!razao.value.trim() || !cnpjOk) { empresasOk = false; return; }
+      empresas.push({ razao: razao.value.trim(), cnpj: formatarDoc(cnpj.value) });
     });
-    atualizarAvisoCadastro();
+    const repetido = new Set(empresas.map((x) => soDoc(x.cnpj))).size !== empresas.length;
+    chk("empresas", empresasOk && empresas.length && !repetido,
+      repetido ? "CNPJ repetido." : empresas.length || !empresasOk ? "Confira razão social e CNPJ marcados em vermelho." : "Cadastre ao menos uma empresa.");
+    if (!ok) return;
+
+    const btn = $('button[type="submit"]', formDados);
+    btn.disabled = true;
+    btn.textContent = "Verificando código…";
+    let cliente;
+    try {
+      cliente = (await api("validar", {}, f.codigo.value)).cliente;
+    } catch (err) {
+      marcarErro(formDados, "codigo", err.message);
+      return;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Salvar";
+    }
+
+    store.set(K.prestador, {
+      codigo: f.codigo.value, cliente, contato: f.contato.value.trim(), fone: f.fone.value.trim(), empresas,
+    });
+    carregarPrestador();
     toast("Dados salvos.");
     irPara("nova");
   });
+
+  function preencherEmitentes() {
+    const sel = $("#sel-emitente");
+    const atual = sel.value;
+    sel.length = 0;
+    const empresas = prestador()?.empresas || [];
+    if (empresas.length > 1) sel.add(new Option("— escolha a empresa —", ""));
+    empresas.forEach((emp) => sel.add(new Option(`${emp.razao} — ${emp.cnpj}`, emp.cnpj)));
+    if ([...sel.options].some((o) => o.value === atual)) sel.value = atual;
+  }
 
   // ---------------------------------------------------------------
   // Tomadores frequentes
@@ -212,6 +302,50 @@
       box.appendChild(div);
     });
   }
+
+  // ---------------------------------------------------------------
+  // Anexos
+  // ---------------------------------------------------------------
+  const MAX_ANEXOS = 5;
+  const MAX_BYTES = 10 * 1024 * 1024;
+  let anexos = [];
+
+  const tamanho = (b) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`);
+
+  function desenharAnexos() {
+    const ul = $("#lista-anexos");
+    ul.innerHTML = "";
+    anexos.forEach((f, i) => {
+      const li = document.createElement("li");
+      const span = document.createElement("span");
+      span.textContent = `${f.name} (${tamanho(f.size)})`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-link btn-pequeno";
+      btn.textContent = "Remover";
+      btn.onclick = () => { anexos.splice(i, 1); desenharAnexos(); };
+      li.append(span, btn);
+      ul.appendChild(li);
+    });
+  }
+
+  $("#inp-anexos").addEventListener("change", (e) => {
+    for (const f of e.target.files) {
+      if (anexos.length >= MAX_ANEXOS) { toast(`Máximo de ${MAX_ANEXOS} arquivos.`); break; }
+      if (anexos.some((a) => a.name === f.name && a.size === f.size)) continue;
+      if (anexos.reduce((s, a) => s + a.size, 0) + f.size > MAX_BYTES) { toast("Os anexos passam de 10 MB no total."); continue; }
+      anexos.push(f);
+    }
+    e.target.value = "";
+    desenharAnexos();
+  });
+
+  const lerBase64 = (file) => new Promise((ok, falha) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(",")[1] || "");
+    r.onerror = () => falha(r.error);
+    r.readAsDataURL(file);
+  });
 
   // ---------------------------------------------------------------
   // Formulário da solicitação
@@ -274,19 +408,19 @@
     })
   );
 
-  // Rascunho: não perde o que foi digitado se fechar sem querer
+  // Rascunho: não perde o que foi digitado se fechar sem querer (anexos não entram)
   form.addEventListener("input", () => store.set(K.rascunho, lerForm()));
 
   function lerForm() {
     const f = form.elements;
     const d = {};
     for (const el of f) {
-      if (!el.name || el.type === "radio" || el.type === "checkbox") continue;
+      if (!el.name || el.type === "radio" || el.type === "checkbox" || el.type === "file") continue;
       d[el.name] = el.value.trim();
     }
     d.retencao = f.retencao.value;
-    d.obra = f.obra.value;
     d.retidos = $$('input[name="retidos"]:checked', form).map((c) => c.value);
+    d.obra = f.obra.value;
     d.salvarTomador = f.salvarTomador.checked;
     d.urgente = f.urgente.checked;
     return d;
@@ -298,7 +432,7 @@
       const el = f[k];
       if (!el) continue;
       if (k === "retencao" || k === "obra") { $$(`input[name="${k}"]`, form).forEach((r) => (r.checked = r.value === v)); continue; }
-      if (k === "retidos") { $$('input[name="retidos"]', form).forEach((c) => (c.checked = v.includes(c.value))); continue; }
+      if (k === "retidos") { $$('input[name="retidos"]', form).forEach((c) => (c.checked = (v || []).includes(c.value))); continue; }
       if (el.type === "checkbox") el.checked = !!v; else el.value = v;
     }
     $("#quais-retencoes").hidden = f.retencao.value !== "Sim";
@@ -306,13 +440,17 @@
   }
 
   function limparForm() {
+    const emitente = $("#sel-emitente").value;
     form.reset();
+    $("#sel-emitente").value = emitente;
     $$(".invalido", form).forEach((el) => el.classList.remove("invalido"));
     $$(".erro", form).forEach((el) => (el.textContent = ""));
     form.elements.competencia.value = hojeISO();
     $("#quais-retencoes").hidden = true;
     $("#linha-obra").hidden = true;
     $("details.endereco").open = false;
+    anexos = [];
+    desenharAnexos();
     store.set(K.rascunho, null);
   }
 
@@ -326,6 +464,7 @@
       marcarErro(form, nome, cond ? "" : msg);
       if (!cond && !primeiro) primeiro = nome;
     };
+    chk("emitente", d.emitente, "Escolha a empresa que emite a nota.");
     chk("tomadorDoc", docValido(d.tomadorDoc), d.tomadorDoc ? "CPF/CNPJ inválido. Confira os números." : "Informe o CPF ou CNPJ.");
     chk("tomadorNome", d.tomadorNome, "Informe o nome ou razão social.");
     chk("tomadorEmail", !d.tomadorEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.tomadorEmail), "E-mail inválido.");
@@ -338,7 +477,6 @@
       d.codigoObra ? "O CNO tem 12 números. Confira." : "Informe o código da obra (CNO).");
     if (primeiro) {
       const el = form.elements[primeiro];
-      if (primeiro === "cep") $("details.endereco").open = true;
       el.focus();
       el.scrollIntoView({ block: "center" });
     }
@@ -359,7 +497,7 @@
       `${d.urgente ? "URGENTE — " : ""}SOLICITAÇÃO DE NFS-e — Protocolo ${p.protocolo}`,
       SEP,
       `EMITENTE (prestador)`,
-      `${pr.razao} — CNPJ ${pr.cnpj}`,
+      `${d.emitenteRazao} — CNPJ ${d.emitenteCnpj}`,
       `Solicitado por: ${pr.contato}${pr.fone ? " — " + pr.fone : ""}`,
       SEP,
       `TOMADOR`,
@@ -379,6 +517,8 @@
       `Retenção de impostos: ${ret}`,
       d.vencimento && `Vencimento: ${dataBR(d.vencimento)}`,
       d.infoNota && `Informações extras na nota: ${d.infoNota}`,
+      p.nomesAnexos.length && SEP,
+      p.nomesAnexos.length && `ANEXOS: ${p.nomesAnexos.join("; ")}`,
       d.observacoes && SEP,
       d.observacoes && `OBSERVAÇÕES: ${d.observacoes}`,
     ];
@@ -388,22 +528,26 @@
   }
 
   function assunto(p) {
-    return `${p.dados.urgente ? "[URGENTE] " : ""}Pedido NFS-e ${p.protocolo} — ${p.prestador.razao} → ${p.dados.tomadorNome} — ${moeda(lerValor(p.dados.valor))}`;
+    return `${p.dados.urgente ? "[URGENTE] " : ""}Pedido NFS-e ${p.protocolo} — ${p.dados.emitenteRazao} → ${p.dados.tomadorNome} — ${moeda(lerValor(p.dados.valor))}`;
   }
 
   let pedidoAtual = null;
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const prestador = store.get(K.prestador, null);
-    if (!prestador) {
-      toast("Preencha primeiro os dados da sua empresa.");
+    const pr = prestador();
+    if (!pr) {
+      toast("Preencha primeiro Meus dados.");
       irPara("dados");
       return;
     }
     const dados = lerForm();
     if (!validar(dados)) return;
-    pedidoAtual = { protocolo: gerarProtocolo(), criadoEm: new Date().toISOString(), prestador, dados, enviado: false };
+    const emp = pr.empresas.find((x) => x.cnpj === dados.emitente);
+    dados.emitenteRazao = emp.razao;
+    dados.emitenteCnpj = emp.cnpj;
+    dados.valorNumero = lerValor(dados.valor);
+    pedidoAtual = { protocolo: gerarProtocolo(), prestador: pr, dados, arquivos: [...anexos], nomesAnexos: anexos.map((a) => a.name) };
     pedidoAtual.texto = montarTexto(pedidoAtual);
     $("#txt-revisao").textContent = pedidoAtual.texto;
     $("#btn-enviar").disabled = false;
@@ -414,72 +558,28 @@
   // ---------------------------------------------------------------
   // Envio
   // ---------------------------------------------------------------
-  async function enviarPorEmail(p) {
-    const modo = CFG.envio || "formsubmit";
-    const corpo = {
-      protocolo: p.protocolo,
-      assunto: assunto(p),
-      texto: p.texto,
-      prestador: p.prestador,
-      dados: p.dados,
-    };
-
-    if (modo === "formsubmit") {
-      const r = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(CFG.email)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          _subject: corpo.assunto,
-          _template: "box",
-          _captcha: "false",
-          Pedido: p.texto,
-        }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || String(j.success) !== "true") throw new Error(j.message || `Falha no envio (${r.status})`);
-      return;
-    }
-
-    const r = await fetch(modo, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(corpo),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok) throw new Error(j.erro || `Falha no envio (${r.status})`);
-  }
-
-  function registrarNoHistorico(p) {
-    const h = store.get(K.historico, []).filter((x) => x.protocolo !== p.protocolo);
-    h.unshift(p);
-    store.set(K.historico, h.slice(0, 300));
-  }
-
   async function concluirEnvio() {
     const p = pedidoAtual;
     const btn = $("#btn-enviar");
     btn.disabled = true;
-    btn.textContent = "Enviando…";
+    btn.textContent = p.arquivos.length ? "Enviando anexos…" : "Enviando…";
     try {
-      await enviarPorEmail(p);
-      p.enviado = true;
+      const anexosB64 = await Promise.all(p.arquivos.map(async (f) => ({
+        nome: f.name, tipo: f.type || "application/octet-stream", base64: await lerBase64(f),
+      })));
+      await api("enviar", { protocolo: p.protocolo, assunto: assunto(p), texto: p.texto, dados: p.dados, anexos: anexosB64 });
     } catch (err) {
-      p.erro = String(err.message || err);
-    }
-    registrarNoHistorico(p);
-    if (p.dados.salvarTomador) salvarTomador(p.dados);
-    preencherSelectFrequentes();
-
-    if (!p.enviado) {
       btn.disabled = false;
       btn.textContent = "Tentar enviar de novo";
       alert(
         "Não foi possível enviar agora.\n\n" +
-        "O pedido ficou salvo no Histórico. Você pode tentar de novo, ou usar “Copiar texto” " +
-        `e mandar para ${CFG.email}.\n\nDetalhe: ${p.erro}`
+        "Confira a internet e clique em “Tentar enviar de novo”. Se continuar, use “Copiar texto” " +
+        `e mande para ${CFG.email}.\n\nDetalhe: ${err.message}`
       );
       return;
     }
+    if (p.dados.salvarTomador) salvarTomador(p.dados);
+    preencherSelectFrequentes();
     $("#dlg-revisao").close();
     limparForm();
     $("#ok-protocolo").textContent = p.protocolo;
@@ -493,67 +593,102 @@
   $("#btn-ok").addEventListener("click", () => $("#dlg-ok").close());
 
   // ---------------------------------------------------------------
-  // Histórico
+  // Minhas notas (lista vinda do escritório)
   // ---------------------------------------------------------------
-  function desenharHistorico() {
-    const h = store.get(K.historico, []);
+  const classeStatus = (s) =>
+    /emitida/i.test(s) ? "emitida" : /pendente/i.test(s) ? "pendente" : /cancel/i.test(s) ? "cancelado" : "";
+
+  async function abrirNota(protocolo, arquivo, baixar) {
+    toast("Abrindo nota…");
+    try {
+      const j = await api("baixar", { protocolo, arquivoId: arquivo.id });
+      const bytes = Uint8Array.from(atob(j.base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: j.tipo || "application/pdf" }));
+      if (baixar) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = j.nome || arquivo.nome;
+        a.click();
+      } else {
+        window.open(url, "_blank");
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      toast(`Não foi possível abrir: ${err.message}`);
+    }
+  }
+
+  async function desenharHistorico() {
     const box = $("#lista-historico");
+    if (!prestador()) { box.innerHTML = '<p class="dica">Preencha Meus dados para ver suas notas.</p>'; return; }
+    box.innerHTML = '<p class="dica">Carregando…</p>';
+    let pedidos;
+    try {
+      pedidos = (await api("listar")).pedidos;
+    } catch (err) {
+      box.innerHTML = "";
+      const p = document.createElement("p");
+      p.className = "dica";
+      p.textContent = `Não foi possível carregar agora (${err.message}). Confira a internet e clique em Atualizar.`;
+      box.appendChild(p);
+      return;
+    }
     box.innerHTML = "";
-    if (!h.length) { box.innerHTML = '<p class="dica">Nenhum pedido ainda.</p>'; return; }
+    if (!pedidos.length) { box.innerHTML = '<p class="dica">Nenhum pedido ainda.</p>'; return; }
 
-    h.forEach((p) => {
-      const item = document.createElement("div");
-      item.className = "item-hist";
-      const cab = document.createElement("div");
-      cab.className = "cab";
-      const esq = document.createElement("div");
-      const nome = document.createElement("strong");
-      nome.textContent = p.dados.tomadorNome;
-      esq.appendChild(nome);
-      if (!p.enviado) {
-        const s = document.createElement("span");
-        s.className = "selo";
-        s.textContent = "não enviado";
-        esq.appendChild(s);
-      }
-      const det = document.createElement("div");
-      det.className = "dica";
-      det.textContent = `Protocolo ${p.protocolo} · ${new Date(p.criadoEm).toLocaleString("pt-BR")}`;
-      esq.appendChild(det);
-      const val = document.createElement("div");
-      val.className = "valor";
-      val.textContent = moeda(lerValor(p.dados.valor));
-      cab.append(esq, val);
+    const el = (tag, cls, txt) => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (txt !== undefined) n.textContent = txt;
+      return n;
+    };
 
-      const acoes = document.createElement("div");
-      acoes.className = "acoes";
-      const mk = (txt, fn) => {
-        const b = document.createElement("button");
-        b.className = "btn btn-secundario btn-pequeno";
-        b.textContent = txt;
-        b.onclick = fn;
-        acoes.appendChild(b);
-      };
-      if (!p.enviado) {
-        mk("Enviar agora", async () => {
-          try { await enviarPorEmail(p); p.enviado = true; delete p.erro; registrarNoHistorico(p); toast("Pedido enviado."); }
-          catch (err) { toast("Ainda não foi possível enviar."); }
-          desenharHistorico();
+    pedidos.forEach((p) => {
+      const item = el("div", "item-hist");
+      const cab = el("div", "cab");
+      const esq = el("div");
+      esq.append(el("strong", "", p.tomador), el("span", `status ${classeStatus(p.status)}`, p.status));
+      esq.appendChild(el("div", "dica",
+        `Protocolo ${p.protocolo} · ${new Date(p.data).toLocaleDateString("pt-BR")}${p.emitente ? " · " + p.emitente : ""}`));
+      const valor = typeof p.valor === "number" ? moeda(p.valor) : String(p.valor || "");
+      cab.append(esq, el("div", "valor", valor));
+      item.appendChild(cab);
+
+      if (p.mensagem) item.appendChild(el("div", "mensagem", `Escritório: ${p.mensagem}`));
+
+      if (p.notas && p.notas.length) {
+        const notas = el("div", "notas");
+        p.notas.forEach((n) => {
+          const linha = el("div", "nota");
+          const ver = el("button", "btn btn-primario btn-pequeno", "Ver PDF");
+          ver.onclick = () => abrirNota(p.protocolo, n, false);
+          const baixar = el("button", "btn btn-secundario btn-pequeno", "Baixar");
+          baixar.onclick = () => abrirNota(p.protocolo, n, true);
+          linha.append(el("span", "nome", n.nome), ver, baixar);
+          notas.appendChild(linha);
         });
+        item.appendChild(notas);
       }
-      mk("Copiar texto", () => copiar(p.texto));
-      mk("Pedir outra igual", () => {
-        const d = { ...p.dados, competencia: hojeISO(), vencimento: "" };
-        irPara("nova");
-        limparForm();
-        preencherForm(d);
-        toast("Dados copiados. Ajuste o que mudou e envie.");
-      });
 
-      item.append(cab, acoes);
+      if (p.dados && p.dados.tomadorNome) {
+        const acoes = el("div", "acoes");
+        const repetir = el("button", "btn btn-secundario btn-pequeno", "Pedir outra igual");
+        repetir.onclick = () => {
+          const d = { ...p.dados, competencia: hojeISO(), vencimento: "" };
+          irPara("nova");
+          limparForm();
+          preencherForm(d);
+          if (!prestador().empresas.some((x) => x.cnpj === d.emitente)) $("#sel-emitente").selectedIndex = 0;
+          toast("Dados copiados. Ajuste o que mudou e envie.");
+        };
+        acoes.appendChild(repetir);
+        item.appendChild(acoes);
+      }
       box.appendChild(item);
     });
   }
+
+  $("#btn-atualizar").addEventListener("click", desenharHistorico);
 
   // ---------------------------------------------------------------
   // Instalação como app (ícone na área de trabalho)
@@ -591,7 +726,8 @@
   form.elements.competencia.value = hojeISO();
   const rascunho = store.get(K.rascunho, null);
   if (rascunho) preencherForm(rascunho);
-  if (!store.get(K.prestador, null)) irPara("dados");
+  const codigoNovo = new URLSearchParams(location.search).get("codigo");
+  if (!prestador() || (codigoNovo && normalizarCodigo(codigoNovo) !== prestador().codigo)) irPara("dados");
 
   // Exposto só para testes automatizados
   window.__nfs = { cpfValido, cnpjValido, lerValor, montarTexto };

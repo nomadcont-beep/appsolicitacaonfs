@@ -22,7 +22,7 @@
     </div>
     <nav class="abas">
       <button class="aba ativa" data-tela="nova">Nova solicitação</button>
-      <button class="aba" data-tela="historico">Histórico</button>
+      <button class="aba" data-tela="historico">Minhas notas</button>
       <button class="aba" data-tela="dados">Meus dados</button>
     </nav>
   </header>
@@ -31,10 +31,18 @@
     <!-- ======================= NOVA SOLICITAÇÃO ======================= -->
     <section id="tela-nova" class="tela">
       <div id="aviso-cadastro" class="aviso" hidden>
-        Antes do primeiro pedido, preencha os dados da sua empresa em <a href="#" data-ir="dados">Meus dados</a>.
+        Antes do primeiro pedido, preencha <a href="#" data-ir="dados">Meus dados</a> com o código de acesso enviado pelo escritório.
       </div>
 
       <form id="form-nfs" novalidate>
+        <fieldset>
+          <legend>Quem emite a nota</legend>
+          <label class="campo largo">Empresa *
+            <select name="emitente" id="sel-emitente"></select>
+            <small class="erro" data-erro="emitente"></small>
+          </label>
+        </fieldset>
+
         <fieldset>
           <legend>Para quem é a nota (tomador)</legend>
 
@@ -160,6 +168,16 @@
         </fieldset>
 
         <fieldset>
+          <legend>Anexos <span class="dica">(opcional — contrato, pedido de compra, medição…)</span></legend>
+          <label class="btn btn-secundario btn-arquivo">
+            Escolher arquivos
+            <input type="file" id="inp-anexos" multiple accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx,.csv,.txt,.xml">
+          </label>
+          <span class="dica">Até 5 arquivos, 10 MB no total.</span>
+          <ul id="lista-anexos" class="lista-anexos"></ul>
+        </fieldset>
+
+        <fieldset>
           <legend>Para o escritório</legend>
           <label class="campo largo">Observações
             <textarea name="observacoes" rows="2" placeholder="Algo que precisamos saber?"></textarea>
@@ -179,7 +197,10 @@
 
     <!-- ======================= HISTÓRICO ======================= -->
     <section id="tela-historico" class="tela" hidden>
-      <p class="dica">Pedidos enviados deste computador.</p>
+      <div class="cab-lista">
+        <p class="dica">Quando o escritório emitir, o PDF da nota aparece aqui.</p>
+        <button class="btn btn-secundario btn-pequeno" id="btn-atualizar">Atualizar</button>
+      </div>
       <div id="lista-historico"></div>
     </section>
 
@@ -187,15 +208,12 @@
     <section id="tela-dados" class="tela" hidden>
       <form id="form-dados" novalidate>
         <fieldset>
-          <legend>Sua empresa (quem emite a nota)</legend>
+          <legend>Acesso</legend>
           <div class="linha">
-            <label class="campo largo">Razão social *
-              <input name="razao" required>
-              <small class="erro" data-erro="razao"></small>
-            </label>
-            <label class="campo">CNPJ *
-              <input name="cnpj" id="cnpjPrestador" required placeholder="00.000.000/0000-00">
-              <small class="erro" data-erro="cnpj"></small>
+            <label class="campo">Código de acesso (enviado pelo escritório) *
+              <input name="codigo" id="inp-codigo" required autocomplete="off" placeholder="XXXX-XXXX-XXXX" maxlength="14">
+              <small class="erro" data-erro="codigo"></small>
+              <small class="info" id="codigo-status"></small>
             </label>
           </div>
           <div class="linha">
@@ -208,6 +226,14 @@
             </label>
           </div>
         </fieldset>
+
+        <fieldset>
+          <legend>Suas empresas (quem emite as notas)</legend>
+          <div id="lista-empresas"></div>
+          <small class="erro" data-erro="empresas"></small>
+          <button type="button" class="btn btn-secundario btn-pequeno" id="btn-add-empresa">+ Adicionar empresa</button>
+        </fieldset>
+
         <div class="acoes">
           <button type="submit" class="btn btn-primario">Salvar</button>
         </div>
@@ -235,11 +261,23 @@
     <h2>Pedido registrado</h2>
     <p>Protocolo <strong id="ok-protocolo"></strong></p>
     <p id="ok-prazo" class="dica"></p>
-    <p class="dica">Uma cópia fica no Histórico deste computador.</p>
+    <p class="dica">Acompanhe o andamento em “Minhas notas”.</p>
     <div class="acoes">
       <button class="btn btn-primario" id="btn-ok">Fechar</button>
     </div>
   </dialog>
+
+  <template id="tpl-empresa">
+    <div class="linha empresa">
+      <label class="campo largo">Razão social *
+        <input data-campo="razao">
+      </label>
+      <label class="campo">CNPJ *
+        <input data-campo="cnpj" placeholder="00.000.000/0000-00">
+      </label>
+      <button type="button" class="btn btn-link btn-remover" title="Remover empresa">Remover</button>
+    </div>
+  </template>
 
   <div id="toast" role="status" hidden></div>
 

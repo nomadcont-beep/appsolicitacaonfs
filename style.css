@@ -106,7 +106,6 @@ dialog pre {
 .item-hist .cab { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .item-hist .valor { font-weight: 600; }
 .item-hist .acoes { justify-content: flex-start; margin-top: 8px; }
-.selo { font-size: .75rem; background: #fde2e1; color: var(--erro); padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
 
 .tomador-salvo { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #eef1f4; }
 .tomador-salvo:last-child { border-bottom: 0; }
@@ -117,3 +116,26 @@ dialog pre {
 }
 
 [hidden] { display: none !important; }
+
+/* Anexos */
+.btn-arquivo { display: inline-block; position: relative; overflow: hidden; margin-right: 8px; }
+.btn-arquivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.lista-anexos { list-style: none; padding: 0; margin: 10px 0 0; }
+.lista-anexos li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #eef1f4; }
+.lista-anexos li:last-child { border-bottom: 0; }
+
+/* Empresas */
+.empresa { align-items: flex-start; border-bottom: 1px solid #eef1f4; margin-bottom: 8px; }
+.empresa .btn-remover { margin-top: 22px; }
+.empresa .invalido { border-color: var(--erro); }
+
+/* Minhas notas */
+.cab-lista { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.status { font-size: .75rem; padding: 2px 8px; border-radius: 10px; margin-left: 6px; background: #e8eef5; color: var(--azul); white-space: nowrap; }
+.status.emitida { background: #dcf3e5; color: #11663a; }
+.status.pendente { background: #fff1cc; color: #7a5300; }
+.status.cancelado { background: #eceff3; color: var(--suave); text-decoration: line-through; }
+.mensagem { background: #fff8e1; border-left: 3px solid #f0b400; padding: 6px 10px; margin-top: 8px; font-size: .9rem; }
+.notas { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.nota { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nota .nome { font-weight: 600; color: #11663a; }
