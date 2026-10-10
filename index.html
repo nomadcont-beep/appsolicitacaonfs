@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solicitar NFS-e</title>
+  <meta name="theme-color" content="#1f4e79">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-conteudo">
+      <div>
+        <h1>Solicitar Nota Fiscal de Serviço</h1>
+        <p id="nome-escritorio" class="sub"></p>
+      </div>
+      <button id="btn-instalar" class="btn btn-claro" hidden>Instalar na área de trabalho</button>
+    </div>
+    <nav class="abas">
+      <button class="aba ativa" data-tela="nova">Nova solicitação</button>
+      <button class="aba" data-tela="historico">Histórico</button>
+      <button class="aba" data-tela="dados">Meus dados</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ======================= NOVA SOLICITAÇÃO ======================= -->
+    <section id="tela-nova" class="tela">
+      <div id="aviso-cadastro" class="aviso" hidden>
+        Antes do primeiro pedido, preencha os dados da sua empresa em <a href="#" data-ir="dados">Meus dados</a>.
+      </div>
+
+      <form id="form-nfs" novalidate>
+        <fieldset>
+          <legend>Para quem é a nota (tomador)</legend>
+
+          <div class="linha" id="linha-frequentes" hidden>
+            <label class="campo largo">Clientes já usados
+              <select id="sel-frequente">
+                <option value="">— selecione para preencher —</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="linha">
+            <label class="campo">CPF ou CNPJ *
+              <input name="tomadorDoc" id="tomadorDoc" required inputmode="text" autocomplete="off" placeholder="000.000.000-00 ou 00.000.000/0000-00">
+              <small class="erro" data-erro="tomadorDoc"></small>
+            </label>
+            <label class="campo largo">Nome / Razão social *
+              <input name="tomadorNome" required autocomplete="off">
+              <small class="erro" data-erro="tomadorNome"></small>
+            </label>
+          </div>
+
+          <div class="linha">
+            <label class="campo largo">E-mail do tomador (para receber a nota)
+              <input name="tomadorEmail" type="email" autocomplete="off">
+              <small class="erro" data-erro="tomadorEmail"></small>
+            </label>
+            <label class="campo">Telefone
+              <input name="tomadorFone" inputmode="tel" autocomplete="off">
+            </label>
+          </div>
+
+          <details class="endereco">
+            <summary>Endereço do tomador <span class="dica">(preencha se for pessoa física ou se souber)</span></summary>
+            <div class="linha">
+              <label class="campo curto">CEP
+                <input name="cep" id="cep" inputmode="numeric" maxlength="9" placeholder="00000-000">
+                <small class="info" id="cep-status"></small>
+              </label>
+              <label class="campo largo">Rua
+                <input name="logradouro">
+              </label>
+              <label class="campo curto">Número
+                <input name="numero">
+              </label>
+            </div>
+            <div class="linha">
+              <label class="campo">Complemento <input name="complemento"></label>
+              <label class="campo">Bairro <input name="bairro"></label>
+              <label class="campo">Cidade <input name="cidade"></label>
+              <label class="campo mini">UF <input name="uf" maxlength="2"></label>
+            </div>
+          </details>
+
+          <label class="check">
+            <input type="checkbox" name="salvarTomador" checked>
+            Guardar este cliente para os próximos pedidos
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Serviço</legend>
+          <label class="campo largo">Descrição do serviço (como deve sair na nota) *
+            <textarea name="descricao" rows="4" required placeholder="Ex.: Manutenção preventiva em equipamentos de ar-condicionado, referente a setembro/2026."></textarea>
+            <small class="erro" data-erro="descricao"></small>
+          </label>
+
+          <div class="linha">
+            <label class="campo">Valor do serviço (R$) *
+              <input name="valor" id="valor" inputmode="decimal" required placeholder="0,00">
+              <small class="erro" data-erro="valor"></small>
+            </label>
+            <label class="campo">Data do serviço (competência) *
+              <input name="competencia" type="date" required>
+              <small class="erro" data-erro="competencia"></small>
+            </label>
+            <label class="campo">Cidade onde o serviço foi feito
+              <input name="localPrestacao" placeholder="Ex.: Blumenau/SC">
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Retenções e pagamento</legend>
+          <div class="campo largo">
+            <span class="rotulo">O cliente vai reter algum imposto na nota?</span>
+            <div class="opcoes">
+              <label><input type="radio" name="retencao" value="Não" checked> Não</label>
+              <label><input type="radio" name="retencao" value="Sim"> Sim</label>
+              <label><input type="radio" name="retencao" value="Não sei"> Não sei — o escritório verifica</label>
+            </div>
+          </div>
+          <div class="opcoes" id="quais-retencoes" hidden>
+            <label><input type="checkbox" name="retidos" value="ISS"> ISS</label>
+            <label><input type="checkbox" name="retidos" value="IR"> IR</label>
+            <label><input type="checkbox" name="retidos" value="INSS"> INSS</label>
+            <label><input type="checkbox" name="retidos" value="PIS/COFINS/CSLL"> PIS/COFINS/CSLL</label>
+          </div>
+
+          <div class="linha">
+            <label class="campo">Vencimento (se houver)
+              <input name="vencimento" type="date">
+            </label>
+            <label class="campo largo">Informações extras para a nota
+              <input name="infoNota" placeholder="Ex.: nº do pedido/contrato, dados para depósito">
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Para o escritório</legend>
+          <label class="campo largo">Observações
+            <textarea name="observacoes" rows="2" placeholder="Algo que precisamos saber?"></textarea>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="urgente">
+            É urgente (preciso da nota hoje)
+          </label>
+        </fieldset>
+
+        <div class="acoes">
+          <button type="button" class="btn btn-secundario" id="btn-limpar">Limpar</button>
+          <button type="submit" class="btn btn-primario">Revisar e enviar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ======================= HISTÓRICO ======================= -->
+    <section id="tela-historico" class="tela" hidden>
+      <p class="dica">Pedidos enviados deste computador.</p>
+      <div id="lista-historico"></div>
+    </section>
+
+    <!-- ======================= MEUS DADOS ======================= -->
+    <section id="tela-dados" class="tela" hidden>
+      <form id="form-dados" novalidate>
+        <fieldset>
+          <legend>Sua empresa (quem emite a nota)</legend>
+          <div class="linha">
+            <label class="campo largo">Razão social *
+              <input name="razao" required>
+              <small class="erro" data-erro="razao"></small>
+            </label>
+            <label class="campo">CNPJ *
+              <input name="cnpj" id="cnpjPrestador" required placeholder="00.000.000/0000-00">
+              <small class="erro" data-erro="cnpj"></small>
+            </label>
+          </div>
+          <div class="linha">
+            <label class="campo largo">Seu nome *
+              <input name="contato" required>
+              <small class="erro" data-erro="contato"></small>
+            </label>
+            <label class="campo">Telefone
+              <input name="fone" inputmode="tel">
+            </label>
+          </div>
+        </fieldset>
+        <div class="acoes">
+          <button type="submit" class="btn btn-primario">Salvar</button>
+        </div>
+      </form>
+
+      <fieldset>
+        <legend>Clientes guardados</legend>
+        <div id="lista-tomadores"></div>
+      </fieldset>
+    </section>
+  </main>
+
+  <!-- ======================= REVISÃO / ENVIO ======================= -->
+  <dialog id="dlg-revisao">
+    <h2>Confira antes de enviar</h2>
+    <pre id="txt-revisao"></pre>
+    <div class="acoes coluna">
+      <button class="btn btn-primario" id="btn-enviar">Enviar pedido ao escritório</button>
+      <button class="btn btn-whats" id="btn-whats" hidden>Enviar também pelo WhatsApp</button>
+      <button class="btn btn-secundario" id="btn-copiar">Copiar texto</button>
+      <button class="btn btn-link" id="btn-voltar">Voltar e corrigir</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-ok">
+    <h2>Pedido registrado</h2>
+    <p>Protocolo <strong id="ok-protocolo"></strong></p>
+    <p id="ok-prazo" class="dica"></p>
+    <p class="dica">Uma cópia fica no Histórico deste computador.</p>
+    <div class="acoes">
+      <button class="btn btn-primario" id="btn-ok">Fechar</button>
+    </div>
+  </dialog>
+
+  <div id="toast" role="status" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
