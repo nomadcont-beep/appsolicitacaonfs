@@ -111,8 +111,23 @@
               <input name="competencia" type="date" required>
               <small class="erro" data-erro="competencia"></small>
             </label>
-            <label class="campo">Cidade onde o serviço foi feito
-              <input name="localPrestacao" placeholder="Ex.: Blumenau/SC">
+            <label class="campo">Cidade onde o serviço foi feito *
+              <input name="localPrestacao" required placeholder="Ex.: Blumenau/SC">
+              <small class="erro" data-erro="localPrestacao"></small>
+            </label>
+          </div>
+
+          <div class="campo largo">
+            <span class="rotulo">É serviço de obra de construção civil?</span>
+            <div class="opcoes">
+              <label><input type="radio" name="obra" value="Não" checked> Não</label>
+              <label><input type="radio" name="obra" value="Sim"> Sim</label>
+            </div>
+          </div>
+          <div class="linha" id="linha-obra" hidden>
+            <label class="campo">Código da obra (CNO) *
+              <input name="codigoObra" inputmode="numeric" placeholder="00.000.00000/00">
+              <small class="erro" data-erro="codigoObra"></small>
             </label>
           </div>
         </fieldset>
@@ -211,7 +226,6 @@
     <pre id="txt-revisao"></pre>
     <div class="acoes coluna">
       <button class="btn btn-primario" id="btn-enviar">Enviar pedido ao escritório</button>
-      <button class="btn btn-whats" id="btn-whats" hidden>Enviar também pelo WhatsApp</button>
       <button class="btn btn-secundario" id="btn-copiar">Copiar texto</button>
       <button class="btn btn-link" id="btn-voltar">Voltar e corrigir</button>
     </div>

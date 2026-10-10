@@ -17,9 +17,6 @@ window.APP_CONFIG = {
   //    Recomendado assim que o app estiver hospedado.
   envio: "formsubmit",
 
-  // WhatsApp opcional (DDI + DDD + número, só dígitos). Deixe "" para esconder.
-  whatsapp: "",
-
   // Prazo informado ao cliente após o envio
   prazoAtendimento: "Emitimos em até 1 dia útil. Pedidos recebidos após as 16h entram no dia seguinte.",
 };

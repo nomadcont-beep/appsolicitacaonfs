@@ -1,7 +1,6 @@
 :root {
   --azul: #1f4e79;
   --azul-escuro: #163a5a;
-  --verde: #1a8f4c;
   --fundo: #f3f5f8;
   --cartao: #ffffff;
   --texto: #1d2733;
@@ -84,7 +83,6 @@ details.endereco summary { cursor: pointer; color: var(--azul); margin-bottom: 1
 .btn-primario:hover { background: var(--azul-escuro); }
 .btn-secundario { background: #fff; color: var(--azul); border-color: var(--borda); }
 .btn-claro { background: #fff; color: var(--azul); }
-.btn-whats { background: var(--verde); color: #fff; }
 .btn-link { background: none; color: var(--suave); text-decoration: underline; }
 .btn-pequeno { padding: 5px 10px; font-size: .85rem; font-weight: 500; }
 

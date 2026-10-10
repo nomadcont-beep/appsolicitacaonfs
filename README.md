@@ -7,7 +7,7 @@ O pedido chega por e-mail em **fiscal@nomadcontabilidade.com.br**.
 ## O que o cliente preenche
 
 - **Tomador:** CPF/CNPJ (validado, aceita o CNPJ alfanumérico), nome, e-mail, telefone, endereço (busca pelo CEP)
-- **Serviço:** descrição, valor, data de competência, cidade da prestação
+- **Serviço:** descrição, valor, data de competência, cidade da prestação e, se for obra de construção civil, o código da obra (CNO)
 - **Retenções:** não / sim (ISS, IR, INSS, PIS/COFINS/CSLL) / não sei
 - **Pagamento e observações:** vencimento, informações extras na nota, urgência
 
@@ -20,7 +20,7 @@ Os dados ficam só no computador do cliente. O escritório recebe apenas o e-mai
 
 ## Configuração
 
-Tudo fica em `config.js`: nome do escritório, e-mail, forma de envio, WhatsApp (opcional) e prazo.
+Tudo fica em `config.js`: nome do escritório, e-mail, forma de envio e prazo.
 
 ### Forma de envio
 

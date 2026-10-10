@@ -55,6 +55,8 @@
     return s;
   }
 
+  const formatarCNO = (s) => s.replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{5})(\d{2})$/, "$1.$2.$3/$4");
+
   function docValido(s) {
     const d = soDoc(s);
     return d.length === 11 ? cpfValido(d) : d.length === 14 ? cnpjValido(d) : false;
@@ -260,6 +262,12 @@
     }
   });
 
+  $$('input[name="obra"]').forEach((r) =>
+    r.addEventListener("change", () => {
+      $("#linha-obra").hidden = form.elements.obra.value !== "Sim";
+    })
+  );
+
   $$('input[name="retencao"]').forEach((r) =>
     r.addEventListener("change", () => {
       $("#quais-retencoes").hidden = form.elements.retencao.value !== "Sim";
@@ -277,6 +285,7 @@
       d[el.name] = el.value.trim();
     }
     d.retencao = f.retencao.value;
+    d.obra = f.obra.value;
     d.retidos = $$('input[name="retidos"]:checked', form).map((c) => c.value);
     d.salvarTomador = f.salvarTomador.checked;
     d.urgente = f.urgente.checked;
@@ -288,11 +297,12 @@
     for (const [k, v] of Object.entries(d)) {
       const el = f[k];
       if (!el) continue;
-      if (k === "retencao") { $$('input[name="retencao"]', form).forEach((r) => (r.checked = r.value === v)); continue; }
+      if (k === "retencao" || k === "obra") { $$(`input[name="${k}"]`, form).forEach((r) => (r.checked = r.value === v)); continue; }
       if (k === "retidos") { $$('input[name="retidos"]', form).forEach((c) => (c.checked = v.includes(c.value))); continue; }
       if (el.type === "checkbox") el.checked = !!v; else el.value = v;
     }
     $("#quais-retencoes").hidden = f.retencao.value !== "Sim";
+    $("#linha-obra").hidden = f.obra.value !== "Sim";
   }
 
   function limparForm() {
@@ -301,6 +311,7 @@
     $$(".erro", form).forEach((el) => (el.textContent = ""));
     form.elements.competencia.value = hojeISO();
     $("#quais-retencoes").hidden = true;
+    $("#linha-obra").hidden = true;
     $("details.endereco").open = false;
     store.set(K.rascunho, null);
   }
@@ -322,6 +333,9 @@
     const v = lerValor(d.valor);
     chk("valor", Number.isFinite(v) && v > 0, "Informe um valor maior que zero.");
     chk("competencia", d.competencia, "Informe a data do serviço.");
+    chk("localPrestacao", d.localPrestacao, "Informe a cidade onde o serviço foi feito.");
+    chk("codigoObra", d.obra !== "Sim" || /^\d{12}$/.test(d.codigoObra.replace(/\D/g, "")),
+      d.codigoObra ? "O CNO tem 12 números. Confira." : "Informe o código da obra (CNO).");
     if (primeiro) {
       const el = form.elements[primeiro];
       if (primeiro === "cep") $("details.endereco").open = true;
@@ -359,7 +373,8 @@
       `Descrição: ${d.descricao}`,
       `Valor: ${moeda(lerValor(d.valor))}`,
       `Competência: ${dataBR(d.competencia)}`,
-      d.localPrestacao && `Local da prestação: ${d.localPrestacao}`,
+      `Local da prestação: ${d.localPrestacao}`,
+      d.obra === "Sim" && `Obra de construção civil — CNO: ${formatarCNO(d.codigoObra)}`,
       SEP,
       `Retenção de impostos: ${ret}`,
       d.vencimento && `Vencimento: ${dataBR(d.vencimento)}`,
@@ -391,7 +406,6 @@
     pedidoAtual = { protocolo: gerarProtocolo(), criadoEm: new Date().toISOString(), prestador, dados, enviado: false };
     pedidoAtual.texto = montarTexto(pedidoAtual);
     $("#txt-revisao").textContent = pedidoAtual.texto;
-    $("#btn-whats").hidden = !CFG.whatsapp;
     $("#btn-enviar").disabled = false;
     $("#btn-enviar").textContent = "Enviar pedido ao escritório";
     $("#dlg-revisao").showModal();
@@ -477,9 +491,6 @@
   $("#btn-copiar").addEventListener("click", () => copiar(pedidoAtual.texto));
   $("#btn-voltar").addEventListener("click", () => $("#dlg-revisao").close());
   $("#btn-ok").addEventListener("click", () => $("#dlg-ok").close());
-  $("#btn-whats").addEventListener("click", () => {
-    window.open(`https://wa.me/${CFG.whatsapp}?text=${encodeURIComponent(pedidoAtual.texto)}`, "_blank");
-  });
 
   // ---------------------------------------------------------------
   // Histórico
